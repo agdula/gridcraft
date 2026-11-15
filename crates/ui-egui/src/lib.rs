@@ -319,9 +319,6 @@ pub struct SheetApp {
     pub native_windows: bool,
     /// View › Arrange All's layout and windows, waiting for the native windows to move.
     pub arrange_windows: Option<(String, Vec<u64>)>,
-    /// The update check, the startup prompt and a running self-update (desktop only).
-    #[cfg(not(target_arch = "wasm32"))]
-    updates_rt: updates_ui::Runtime,
 }
 
 /// Strips the engine's error prefixes for message boxes.

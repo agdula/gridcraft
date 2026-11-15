@@ -181,7 +181,6 @@ fn tree() -> Vec<(&'static str, Vec<Entry>)> {
         (
             "Help",
             vec![
-                ("Check for Updates…", "app.checkForUpdates", None),
                 ("Agent Control (MCP)…", "dialog:agents", None),
                 ("Contributors…", "dialog:about:Contributors", None),
                 ("GridCraft on getartcraft.com", "url:https://getartcraft.com/apps/gridcraft", None),
@@ -402,13 +401,10 @@ mod tests {
     }
 
     #[test]
-    fn help_menu_checks_for_updates_through_the_registered_command() {
+    fn help_menu_leaves_updates_to_the_central_manager() {
         let tree = super::tree();
         let (_, help) = tree.iter().find(|(title, _)| *title == "Help").expect("Help menu");
-        let item = help.iter().find(|e| e.0 == "Check for Updates…").expect("Check for Updates… in the Help menu");
-        assert_eq!(item.1, "app.checkForUpdates");
-        let mut app = super::SheetApp::new(gridcraft_engine::Session::new(), Default::default());
-        assert!(app.run(item.1, serde_json::json!({})).is_ok());
+        assert!(!help.iter().any(|e| e.1 == "app.checkForUpdates"));
     }
 
     #[test]

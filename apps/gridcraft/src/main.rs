@@ -317,7 +317,6 @@ fn main() -> eframe::Result<()> {
     }
     let mut app = SheetApp::new(session, services());
     app.watch_desktop_theme();
-    app.start_update_check();
     let control_port = control_port;
     load_prefs(&mut app);
     // Stamp the startup workbook's author from the persisted user name.
