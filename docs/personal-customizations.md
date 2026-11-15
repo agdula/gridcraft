@@ -9,3 +9,9 @@ the reviewed release. Do not reset it to upstream or install an unmodified build
 This build removes Discord links from the interface, native menus, command
 registries, CLI and MCP wherever present.
 Project documentation and source-code links remain available.
+
+## macOS disk images
+
+The DMG is created without synthesizing FinderInfo on signed resources. The
+packager verifies the application inside the finished image with codesign
+--deep --strict, so an image that would install a rejected app fails the build.

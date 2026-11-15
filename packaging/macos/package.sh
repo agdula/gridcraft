@@ -151,15 +151,32 @@ ln -s /Applications "$STAGE/Applications"
 mkdir -p "$STAGE/.background"
 cp "$HERE/dmg/background.tiff" "$STAGE/.background/background.tiff"
 cp "$HERE/dmg/dmg-layout.DS_Store" "$STAGE/.DS_Store"
-rm -f "$DMG" "$WORK/raw.dmg"
-# makehybrid + convert builds the image without attaching a device, unlike `create -srcfolder`,
-# which is flaky on CI runners ("Resource busy") and hangs in sandboxed sessions.
-# The volume name has no version: .DS_Store finds the background through an alias that includes it.
-hdiutil makehybrid -hfs -hfs-volume-name "GridCraft" -hfs-openfolder "$STAGE" -o "$WORK/raw.dmg" "$STAGE"
-hdiutil convert "$WORK/raw.dmg" -format UDZO -imagekey zlib-level=9 -o "$DMG"
-rm -f "$WORK/raw.dmg"
+rm -f "$DMG"
+# makehybrid synthesizes FinderInfo on the app's resources, which strict code-signature
+# validation rejects after installation. create preserves the signed bundle instead.
+# Attaching a device can transiently fail on CI, so keep bounded retries.
+hdiutil_retry() {
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    if hdiutil "$@"; then return 0; fi
+    [[ "$attempt" = 5 ]] && return 1
+    warn "hdiutil $1 failed (attempt $attempt of 5); retrying in $((attempt * 10))s"
+    sleep $((attempt * 10))
+  done
+  return 1
+}
+hdiutil_retry create -srcfolder "$STAGE" -volname "GridCraft" -fs HFS+ -format UDZO -imagekey zlib-level=9 -ov "$DMG"
 sign "$DMG"
 codesign --verify --strict --verbose=2 "$DMG"
+# Verify the app inside the finished image as well as the container signature.
+MOUNT="$WORK/dmg-check"
+mkdir -p "$MOUNT"
+hdiutil_retry attach -readonly -nobrowse -noautoopen -mountpoint "$MOUNT" "$DMG" >/dev/null
+if ! codesign --verify --deep --strict --verbose=2 "$MOUNT/GridCraft.app"; then
+  hdiutil_retry detach "$MOUNT" >/dev/null || true
+  exit 1
+fi
+hdiutil_retry detach "$MOUNT" >/dev/null
 if [[ "$NOTARIZE" = 1 ]]; then
   notarize "$DMG"
   stapler_retry staple "$DMG"
