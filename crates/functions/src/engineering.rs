@@ -596,13 +596,15 @@ mod tests {
             ("-3-4i", "1-2i"),
             ("-2i", "1-i"),
             ("2i", "1+i"),
-            ("i", "0.707106781186548+0.707106781186547i"),
             ("5-12i", "3-2i"),
             ("-5+12i", "2+3i"),
             ("1E10+1E10i", "109868.411346781+45508.9860562227i"),
         ] {
             is_text(ev("IMSQRT", vec![t(input)]), want);
         }
+        // Windows and Unix libm can round the two components one last digit apart.
+        // Verify sqrt(i) numerically without requiring one platform's text snapshot.
+        cx(ev("IMSQRT", vec![t("i")]), std::f64::consts::FRAC_1_SQRT_2, std::f64::consts::FRAC_1_SQRT_2);
         is_text(ev("IMSQRT", vec![t("4")]), "2");
         is_text(ev("IMSQRT", vec![t("-2i")]), "1-i");
         is_text(ev("IMPOWER", vec![t("2+3i"), n(3.0)]), "-46+9i");

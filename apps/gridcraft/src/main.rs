@@ -64,6 +64,9 @@ impl eframe::App for App {
     fn on_exit(&mut self) {
         print::finish_pending_jobs();
         save_prefs(&self.0);
+        // A ready update installs once the process has exited. The macOS exit below skips
+        // dropping the app, so the helper is started here.
+        self.0.start_pending_update();
         // macOS (#117): end the process here, before eframe tears the window down. AccessKit's
         // macOS adapter subclasses the window's content view and restores its class on teardown;
         // AppKit's Touch Bar support observes that view (KVO), so in the next display cycle
@@ -238,6 +241,12 @@ fn icon() -> Option<egui::IconData> {
 }
 
 fn main() -> eframe::Result<()> {
+    // A confined launcher run (`gridcraft_sandbox::launch_command`) comes before everything else:
+    // it opens no window, writes no log, and becomes the program it confines.
+    let raw: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+    if let Some(code) = gridcraft_sandbox::handle_args(&raw) {
+        std::process::exit(code);
+    }
     // First, so the panic hook and every start-up warning are recorded (`logging`).
     let logger = logging::install();
     // Commands catch their panics (`Session::execute`), but the default hook only prints to
@@ -259,14 +268,6 @@ fn main() -> eframe::Result<()> {
         }
     }));
     let args: Vec<String> = std::env::args().skip(1).collect();
-    // The restart helper a self-update spawns: it finishes the swap and relaunches, then exits.
-    if let Some(done) = craft_update::self_update::finish(&gridcraft_ui_egui::UPDATE_APP, &std::env::args_os().skip(1).collect::<Vec<_>>()) {
-        if let Err(e) = done {
-            eprintln!("GridCraft update helper failed: {e}");
-            std::process::exit(1);
-        }
-        return Ok(());
-    }
     if args.iter().any(|a| a == "--version" || a == "-V") {
         println!("GridCraft {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
@@ -330,12 +331,16 @@ fn main() -> eframe::Result<()> {
     for f in &files {
         app.open_path(f);
     }
+    // Linux/BSD: Excel's layout — no window-manager title bar above ours; our title bar carries the
+    // window controls. `GRIDCRAFT_SYSTEM_TITLEBAR=1` keeps the system frame.
+    app.window_controls = cfg!(not(any(target_os = "macos", target_os = "windows"))) && std::env::var_os("GRIDCRAFT_SYSTEM_TITLEBAR").is_none();
     let mut viewport = egui::ViewportBuilder::default()
         .with_title("GridCraft")
         .with_inner_size([1440.0, 900.0])
         .with_min_inner_size([640.0, 420.0])
         .with_app_id("ai.storyteller.gridcraft")
-        .with_drag_and_drop(true);
+        .with_drag_and_drop(true)
+        .with_decorations(!app.window_controls);
     if cfg!(target_os = "macos") {
         viewport = viewport.with_fullsize_content_view(true).with_titlebar_shown(false).with_title_shown(false);
     }

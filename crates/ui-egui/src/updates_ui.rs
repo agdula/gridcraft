@@ -7,3 +7,5 @@
 use crate::SheetApp;
 
 pub(crate) fn start(_app: &mut SheetApp, _manual: bool) {}
+
+pub(crate) fn start_pending_update(_app: &mut SheetApp) {}
